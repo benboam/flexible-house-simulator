@@ -1,9 +1,14 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 
 
 from grid_data import load_grid_data
+from baseline import (
+    build_ev_baseline,
+    build_heatpump_baseline,
+    build_household_baseline,
+)
 
 
 
@@ -97,6 +102,68 @@ with st.expander("🔋 Home Battery"):
     batt_capacity = st.number_input("Battery capacity (kWh)", min_value=0.0, max_value=50.0, value=5.0)
     batt_power = st.number_input("Max charge/discharge (kW)", min_value=0.0, max_value=10.0, value=3.0)
     batt_eff = st.slider("Round-trip efficiency (%)", min_value=60, max_value=100, value=90)
+
+# ----------------------------------------------------
+# Build baseline load models (EV, heat pump, household)
+# This must run after the widgets above so we can use their values
+# ----------------------------------------------------
+with st.spinner("Building baseline load models..."):
+    # selected_date is a date object from the date_input
+    date_obj = selected_date
+
+    #normalise timezones
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    if df["timestamp"].dt.tz is not None:
+        df["timestamp"] = df["timestamp"].dt.tz_convert(None)
+
+    timestamps = df["timestamp"]
+
+    # EV baseline
+    ev_baseline = build_ev_baseline(
+        date_obj,
+        timestamps,
+        ev_arrival,
+        ev_kwh
+    )
+
+    # Heat pump baseline
+    heatpump_baseline = build_heatpump_baseline(
+        date_obj,
+        timestamps,
+        morning_window=(pd.to_datetime("06:00").time(), pd.to_datetime("09:00").time()),
+        evening_window=(pd.to_datetime("17:00").time(), pd.to_datetime("21:00").time()),
+    )
+
+    # Household baseload
+    house_baseline = build_household_baseline(date_obj, timestamps)
+
+    # Merge all baseline components
+    df = df.merge(ev_baseline, on="timestamp")
+    df = df.merge(heatpump_baseline, on="timestamp")
+    df = df.merge(house_baseline, on="timestamp")
+
+    # Total baseline load
+    df["baseline_kwh"] = (
+        df["ev_kwh"] +
+        df["hp_kwh"] +
+        df["house_kwh"]
+    )
+
+# ----------------------------------------------------
+# Baseline Load Profile (visualisation)
+# ----------------------------------------------------
+st.header("📊 Baseline Load Profile")
+
+st.markdown("""
+This chart shows the household's expected energy demand for the selected day  
+**before Axel performs any optimisation**.
+""")
+
+baseline_cols = ["ev_kwh", "hp_kwh", "house_kwh", "baseline_kwh"]
+
+st.line_chart(
+    df.set_index("timestamp")[baseline_cols]
+)
 
 
 
