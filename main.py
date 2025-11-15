@@ -9,7 +9,7 @@ from baseline import (
     build_heatpump_baseline,
     build_household_baseline,
 )
-
+from optimiser import optimise_ev, optimise_heatpump
 
 
 # ----------------------------------------------------
@@ -188,21 +188,83 @@ opt_goal = st.radio(
 run_opt = st.button("🚀 Run Optimisation")
 
 if run_opt:
-    st.success("Optimisation run! (placeholder)")
-    st.info("Next step: plug in optimiser logic.")
+    # -----------------------------
+    # Run optimisation
+    # -----------------------------
+    hp_total_kwh = df["hp_kwh"].sum()
 
+    ev_opt = optimise_ev(
+        df,
+        selected_date,
+        ev_arrival,
+        ev_depart,
+        ev_kwh,
+        opt_goal,
+        charger_kw=7.0,
+    )
 
-    # Placeholder KPIs
-    st.header("📈 Results Dashboard (Placeholder)")
+    hp_opt = optimise_heatpump(
+        df,
+        hp_total_kwh=hp_total_kwh,
+        opt_goal=opt_goal,
+        max_hours=16,
+    )
+
+    df["ev_kwh_opt"] = ev_opt
+    df["hp_kwh_opt"] = hp_opt
+    df["optimised_kwh"] = df["ev_kwh_opt"] + df["hp_kwh_opt"] + df["house_kwh"]
+
+    # -----------------------------
+    # KPIs: cost & carbon
+    # -----------------------------
+    # price is p/kWh – convert to £
+    baseline_cost = (df["baseline_kwh"] * df["price"]).sum() / 100.0
+    optimised_cost = (df["optimised_kwh"] * df["price"]).sum() / 100.0
+    cost_saved = baseline_cost - optimised_cost
+
+    # carbon_intensity is gCO2/kWh – convert to kg
+    baseline_co2_kg = (df["baseline_kwh"] * df["carbon_intensity"]).sum() / 1000.0
+    optimised_co2_kg = (df["optimised_kwh"] * df["carbon_intensity"]).sum() / 1000.0
+    co2_saved_kg = baseline_co2_kg - optimised_co2_kg
+
+    # Share of load in "green hours" (carbon index low/very low if available)
+    if "carbon_index" in df.columns:
+        green_mask = df["carbon_index"].str.lower().isin(["low", "very low"])
+    else:
+        # Fallback: treat the cleanest 30% periods as "green"
+        threshold = df["carbon_intensity"].quantile(0.3)
+        green_mask = df["carbon_intensity"] <= threshold
+
+    baseline_green_kwh = df.loc[green_mask, "baseline_kwh"].sum()
+    optimised_green_kwh = df.loc[green_mask, "optimised_kwh"].sum()
+
+    baseline_total = df["baseline_kwh"].sum()
+    optimised_total = df["optimised_kwh"].sum()
+
+    baseline_green_pct = 100 * baseline_green_kwh / baseline_total if baseline_total > 0 else 0
+    optimised_green_pct = 100 * optimised_green_kwh / optimised_total if optimised_total > 0 else 0
+
+    # -----------------------------
+    # UI: Results
+    # -----------------------------
+    st.success("Optimisation complete ✅")
+
+    st.header("📈 Results Dashboard")
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("£ Saved", "—")
-    k2.metric("CO₂ Avoided", "—")
-    k3.metric("% Shifted to Green Hours", "—")
+    k1.metric("£ Saved", f"£{cost_saved:0.2f}")
+    k2.metric("CO₂ Avoided (kg)", f"{co2_saved_kg:0.1f}")
+    k3.metric(
+        "% Load in Green Hours",
+        f"{optimised_green_pct:0.1f}%",
+        delta=f"{(optimised_green_pct - baseline_green_pct):+0.1f} pp"
+    )
 
-    # Placeholder comparison chart
-    st.subheader("Baseline vs Optimised Load Profile (placeholder)")
-    st.line_chart(df.set_index("timestamp")[["carbon_intensity"]])  # temp
+    # Comparison chart
+    st.subheader("Baseline vs Optimised Load Profile")
+    st.line_chart(
+        df.set_index("timestamp")[["baseline_kwh", "optimised_kwh"]]
+    )
 
 
 # ----------------------------------------------------
