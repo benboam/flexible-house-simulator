@@ -11,6 +11,12 @@ from baseline import (
 )
 from optimiser import optimise_ev, optimise_heatpump
 
+if "optimised" not in st.session_state:
+    st.session_state.optimised = False
+
+if "results" not in st.session_state:
+    st.session_state.results = None
+
 
 # ----------------------------------------------------
 # Page Config
@@ -185,9 +191,8 @@ opt_goal = st.radio(
 # ----------------------------------------------------
 # 5. Run Button
 # ----------------------------------------------------
-run_opt = st.button("🚀 Run Optimisation")
+if st.button("🚀 Run Optimisation"):
 
-if run_opt:
     # -----------------------------
     # Run optimisation
     # -----------------------------
@@ -244,6 +249,16 @@ if run_opt:
     baseline_green_pct = 100 * baseline_green_kwh / baseline_total if baseline_total > 0 else 0
     optimised_green_pct = 100 * optimised_green_kwh / optimised_total if optimised_total > 0 else 0
 
+    # Save results in session_state
+    st.session_state.optimised = True
+    st.session_state.results = {
+        "df": df.copy(),
+        "cost_saved": cost_saved,
+        "co2_saved_kg": co2_saved_kg,
+        "optimised_green_pct": optimised_green_pct,
+        "baseline_green_pct": baseline_green_pct,
+    }
+
     # -----------------------------
     # UI: Results
     # -----------------------------
@@ -267,8 +282,60 @@ if run_opt:
     )
 
 
+    # ----------------------------------------------------
+    # 6. Scaling Slider — Aggregation Across Many Homes
+    # ----------------------------------------------------
+if st.session_state.optimised:
+
+    res = st.session_state.results
+    df = res["df"]
+    cost_saved = res["cost_saved"]
+    co2_saved_kg = res["co2_saved_kg"]
+    optimised_green_pct = res["optimised_green_pct"]
+    baseline_green_pct = res["baseline_green_pct"]
+
+    st.success("Optimisation complete ✅")
+
+    st.header("📈 Results Dashboard")
+
+    k1, k2, k3 = st.columns(3)
+    k1.metric("£ Saved", f"£{cost_saved:.2f}")
+    k2.metric("CO₂ Avoided (kg)", f"{co2_saved_kg:.1f}")
+    k3.metric(
+        "% Load in Green Hours",
+        f"{optimised_green_pct:.1f}%",
+        delta=f"{(optimised_green_pct - baseline_green_pct):+.1f} pp",
+    )
+
+    st.subheader("Baseline vs Optimised Load Profile")
+    st.line_chart(df.set_index("timestamp")[["baseline_kwh", "optimised_kwh"]])
+
+    # -----------------------------
+    # Scaling Slider
+    # -----------------------------
+    st.subheader("🏘️ Scale to More Homes")
+
+    n_homes = st.slider(
+        "How many homes should this optimisation represent?",
+        min_value=1,
+        max_value=50000,
+        value=1,
+        step=1,
+    )
+
+    st.metric("Scaled £ Savings", f"£{cost_saved * n_homes:.2f}")
+    st.metric("Scaled CO₂ Savings (kg)", f"{co2_saved_kg * n_homes:.1f}")
+
+
 # ----------------------------------------------------
 # End
 # ----------------------------------------------------
-st.markdown("---")
-st.caption("Built for Axel — demonstrating the power of intelligent home flexibility.")
+
+
+
+
+
+
+
+
+
