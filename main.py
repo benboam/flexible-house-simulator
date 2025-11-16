@@ -11,21 +11,30 @@ from baseline import (
 )
 from optimiser import optimise_ev, optimise_heatpump
 
+from plot_helper import make_product_plot, plot_baseline,plot_optimised
+
+
+
+
 
 # ----------------------------------------------------
 # Formatting helpers (money, CO₂, etc.)
 # ----------------------------------------------------
-def fmt_money(x):
+def fmt_money(x: float) -> str:
     """Format numbers as £ with thousands separators."""
     return f"£{x:,.2f}"
 
-def fmt_co2(x_kg):
+
+def fmt_co2(x_kg: float) -> str:
     """Format kg into kg or tonnes depending on size."""
     if x_kg >= 1000:
         return f"{x_kg/1000:,.1f} t"
     return f"{x_kg:,.1f} kg"
 
 
+# ----------------------------------------------------
+# Session state for optimisation results
+# ----------------------------------------------------
 if "optimised" not in st.session_state:
     st.session_state.optimised = False
 
@@ -34,44 +43,159 @@ if "results" not in st.session_state:
 
 
 # ----------------------------------------------------
-# Page Config
+# Page Config + Global Styling (Soft UI)
 # ----------------------------------------------------
 st.set_page_config(
     page_title="Axel Home Optimiser",
+    page_icon="⚡",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
+
+# Soft UI CSS
+st.markdown(
+    """
+<style>
+    body {
+        background-color: #f4f5fb;
+    }
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1200px;
+    }
+    .main .block-container {
+        background-color: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+    }
+    h1, h2, h3, h4 {
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    .stButton>button {
+        border-radius: 999px;
+        padding: 0.6rem 1.4rem;
+        border: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+        background: linear-gradient(135deg, #4ade80, #22c55e);
+        color: #ffffff;
+        box-shadow: 0 8px 20px rgba(34, 197, 94, 0.35);
+    }
+    .stButton>button:hover {
+        filter: brightness(1.05);
+    }
+    .soft-card {
+        background-color: #f8fafc;
+        border-radius: 16px;
+        padding: 1rem 1.2rem;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        margin-bottom: 1.2rem;
+    }
+    .soft-card h3 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+    .soft-metric .metric-label {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+    .soft-metric .metric-value {
+        font-weight: 600;
+        font-size: 1.2rem;
+        color: #0f172a;
+    }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# ----------------------------------------------------
+# Clean soft-card metric styling
+# ----------------------------------------------------
+st.markdown("""
+<style>
+.soft-card {
+    background: rgba(245, 248, 250, 0.9);
+    padding: 1.2rem 1.4rem;
+    border-radius: 14px;
+    border: 1px solid rgba(200, 200, 200, 0.35);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 1.2rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #4A4A4A;
+    margin-bottom: 0.35rem;
+}
+
+.metric-value {
+    font-size: 1.7rem;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+def soft_metric(label, value):
+    """Return a fully self-contained metric card."""
+    return f"""
+    <div class="soft-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">{value}</div>
+    </div>
+    """
 
 
 # ----------------------------------------------------
 # Title + Intro
 # ----------------------------------------------------
+
+
+
 st.title("⚡ Axel Home Flex Optimiser")
-st.markdown("""
-This tool demonstrates how intelligently shifting home energy use  
-(EVs, batteries, heat pumps) can reduce **costs**, **carbon**,  
-and make the grid more efficient.
-""")
+st.markdown(
+        """
+Imagine thousands of homes acting like a **virtual power plant**.
+
+This demo uses real UK grid data and shows how smartly shifting **EV charging** and **heating**
+can:
+
+- cut **costs** for households  
+- reduce **CO₂**  
+- and make the grid more **renewable-friendly**.
+"""
+    )
+
+
+
+st.divider()
 
 
 # ----------------------------------------------------
 # 1. Choose a day
 # ----------------------------------------------------
-st.header("📅 Choose a Day to Simulate")
+st.subheader("📅 Choose a Day to Simulate")
 
 selected_date = st.date_input(
     "Select a date",
     value=date.today(),
     min_value=date(2018, 1, 1),
-    max_value=date(2030, 1, 1)
+    max_value=date.today(),
+    help="Pick any date with UK Carbon Intensity + Agile price data available.",
 )
-
 date_str = selected_date.strftime("%Y-%m-%d")
+
+st.divider()
 
 
 # ----------------------------------------------------
 # Load grid data
 # ----------------------------------------------------
-with st.spinner("Fetching UK grid data..."):
+with st.spinner("Fetching UK grid & price data for this day..."):
     df = load_grid_data(date_str)
 
 if df.empty:
@@ -80,59 +204,77 @@ if df.empty:
 
 
 # ----------------------------------------------------
-# 2. Grid Overview
+# 2. Grid Overview (Tabs)
 # ----------------------------------------------------
-st.header("🔌 Grid Overview for the Day")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.subheader("Wind & Solar Share (%)")
-    st.line_chart(df.set_index("timestamp")[["wind_share", "solar_share"]])
-
-with col2:
-    st.subheader("Carbon Intensity (gCO₂/kWh)")
-    st.line_chart(df.set_index("timestamp")[["carbon_intensity"]])
-
-with col3:
-    st.subheader("Agile Price (p/kWh)")
-    st.line_chart(df.set_index("timestamp")[["price"]])
+st.subheader("🌱 Clean Energy & Price Landscape")
+st.altair_chart(make_product_plot(df), use_container_width=True)
 
 
 # ----------------------------------------------------
-# 3. Home Profile
+# 3. Home Profile (Friendly cards)
 # ----------------------------------------------------
-st.header("🏠 Home Energy Profile")
+st.subheader("🏠 Home Energy Profile")
+
+st.markdown(
+    """
+Describe a **typical day** in this home.
+
+We'll build a **baseline** (unoptimised) load profile from these assumptions.
+"""
+)
+
+profile_cols = st.columns(3)
 
 # EV Settings -----------------------------------------------------
-with st.expander("🚗 Electric Vehicle"):
-    ev_arrival = st.time_input("EV arrival time", value=pd.to_datetime("18:00").time())
-    ev_depart  = st.time_input("EV departure time", value=pd.to_datetime("07:00").time())
-    ev_kwh     = st.number_input("Charge needed (kWh)", min_value=0.0, max_value=100.0, value=10.0)
-
+with profile_cols[0]:
+    with st.expander("🚗 Electric Vehicle", expanded=True):
+        ev_arrival = st.time_input("EV arrival time", value=pd.to_datetime("18:00").time())
+        ev_depart = st.time_input("EV departure time", value=pd.to_datetime("07:00").time())
+        ev_kwh = st.number_input(
+            "Charge needed by departure (kWh)",
+            min_value=0.0,
+            max_value=100.0,
+            value=10.0,
+            step=1.0,
+        )
+        st.caption("Assumes a 7 kW home charger, no V2G in the baseline.")
 
 # Heat Pump Settings ----------------------------------------------
-with st.expander("🔥 Heat Pump"):
-    hp_kwh = st.number_input("Daily heat demand (kWh)", min_value=0.0, max_value=40.0, value=8.0)
-    hp_start = st.time_input("Heating allowed from", value=pd.to_datetime("06:00").time())
-    hp_end   = st.time_input("Heating allowed until", value=pd.to_datetime("22:00").time())
-
+with profile_cols[1]:
+    with st.expander("🔥 Heat Pump", expanded=True):
+        hp_kwh = st.number_input(
+            "Daily heat demand (kWh, thermal)",
+            min_value=0.0,
+            max_value=40.0,
+            value=8.0,
+            step=1.0,
+        )
+        hp_start = st.time_input("Heating allowed from", value=pd.to_datetime("06:00").time())
+        hp_end = st.time_input("Heating allowed until", value=pd.to_datetime("22:00").time())
+        st.caption("We spread heating across comfort windows within this range.")
 
 # Battery Settings -------------------------------------------------
-with st.expander("🔋 Home Battery"):
-    batt_capacity = st.number_input("Battery capacity (kWh)", min_value=0.0, max_value=50.0, value=5.0)
-    batt_power = st.number_input("Max charge/discharge (kW)", min_value=0.0, max_value=10.0, value=3.0)
-    batt_eff = st.slider("Round-trip efficiency (%)", min_value=60, max_value=100, value=90)
+with profile_cols[2]:
+    with st.expander("🔋 Home Battery (not yet optimised)", expanded=False):
+        batt_capacity = st.number_input(
+            "Battery capacity (kWh)", min_value=0.0, max_value=50.0, value=5.0, step=1.0
+        )
+        batt_power = st.number_input(
+            "Max charge/discharge (kW)", min_value=0.0, max_value=10.0, value=3.0, step=0.5
+        )
+        batt_eff = st.slider(
+            "Round-trip efficiency (%)", min_value=60, max_value=100, value=90, step=1
+        )
+        st.caption("Battery is included in the profile but not yet actively optimised.")
+
 
 # ----------------------------------------------------
 # Build baseline load models (EV, heat pump, household)
-# This must run after the widgets above so we can use their values
 # ----------------------------------------------------
 with st.spinner("Building baseline load models..."):
-    # selected_date is a date object from the date_input
     date_obj = selected_date
 
-    #normalise timezones
+    # Normalise timestamps to naive datetime
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     if df["timestamp"].dt.tz is not None:
         df["timestamp"] = df["timestamp"].dt.tz_convert(None)
@@ -144,10 +286,10 @@ with st.spinner("Building baseline load models..."):
         date_obj,
         timestamps,
         ev_arrival,
-        ev_kwh
+        ev_kwh,
     )
 
-    # Heat pump baseline
+    # Heat pump baseline (internal seasonal model)
     heatpump_baseline = build_heatpump_baseline(
         date_obj,
         timestamps,
@@ -164,50 +306,49 @@ with st.spinner("Building baseline load models..."):
     df = df.merge(house_baseline, on="timestamp")
 
     # Total baseline load
-    df["baseline_kwh"] = (
-        df["ev_kwh"] +
-        df["hp_kwh"] +
-        df["house_kwh"]
-    )
+    df["baseline_kwh"] = df["ev_kwh"] + df["hp_kwh"] + df["house_kwh"]
+
 
 # ----------------------------------------------------
 # Baseline Load Profile (visualisation)
 # ----------------------------------------------------
-st.header("📊 Baseline Load Profile")
+st.subheader("📊 Baseline Load Profile")
 
-st.markdown("""
-This chart shows the household's expected energy demand for the selected day  
-**before Axel performs any optimisation**.
-""")
+st.markdown(
+    """
+This is how the home would normally behave, **without** any smart control:
 
-baseline_cols = ["ev_kwh", "hp_kwh", "house_kwh", "baseline_kwh"]
-
-st.line_chart(
-    df.set_index("timestamp")[baseline_cols]
+- EV starts charging as soon as it arrives  
+- Heating is spread across comfort windows  
+- Household baseload ticks along in the background
+"""
 )
 
+#baseline_cols = ["ev_kwh", "hp_kwh", "house_kwh", "baseline_kwh"]
+st.altair_chart(plot_baseline(df), use_container_width=True)
+
+
+st.divider()
 
 
 # ----------------------------------------------------
 # 4. Optimisation Goal
 # ----------------------------------------------------
-st.header("🎯 Optimisation Goal")
+st.subheader("🎯 Optimisation Goal")
 
 opt_goal = st.radio(
-    "What should Axel optimise for?",
-    [
-        "Cheapest energy",
-        "Lowest carbon",
-        "Balanced"
-    ]
+    "What should Axel optimise for on this day?",
+    ["Cheapest energy", "Lowest carbon", "Balanced"],
+    horizontal=True,
 )
 
 
 # ----------------------------------------------------
-# 5. Run Button
+# 5. Run Button – compute optimisation & store results
 # ----------------------------------------------------
-if st.button("🚀 Run Optimisation"):
+run_clicked = st.button("🚀 Run Optimisation", use_container_width=True)
 
+if run_clicked:
     # -----------------------------
     # Run optimisation
     # -----------------------------
@@ -237,17 +378,17 @@ if st.button("🚀 Run Optimisation"):
     # -----------------------------
     # KPIs: cost & carbon
     # -----------------------------
-    # price is p/kWh – convert to £
+    # Price is p/kWh – convert to £
     baseline_cost = (df["baseline_kwh"] * df["price"]).sum() / 100.0
     optimised_cost = (df["optimised_kwh"] * df["price"]).sum() / 100.0
     cost_saved = baseline_cost - optimised_cost
 
-    # carbon_intensity is gCO2/kWh – convert to kg
+    # Carbon intensity is gCO₂/kWh – convert to kg
     baseline_co2_kg = (df["baseline_kwh"] * df["carbon_intensity"]).sum() / 1000.0
     optimised_co2_kg = (df["optimised_kwh"] * df["carbon_intensity"]).sum() / 1000.0
     co2_saved_kg = baseline_co2_kg - optimised_co2_kg
 
-    # Share of load in "green hours" (carbon index low/very low if available)
+    # Share of load in "green hours"
     if "carbon_index" in df.columns:
         green_mask = df["carbon_index"].str.lower().isin(["low", "very low"])
     else:
@@ -261,8 +402,12 @@ if st.button("🚀 Run Optimisation"):
     baseline_total = df["baseline_kwh"].sum()
     optimised_total = df["optimised_kwh"].sum()
 
-    baseline_green_pct = 100 * baseline_green_kwh / baseline_total if baseline_total > 0 else 0
-    optimised_green_pct = 100 * optimised_green_kwh / optimised_total if optimised_total > 0 else 0
+    baseline_green_pct = (
+        100 * baseline_green_kwh / baseline_total if baseline_total > 0 else 0
+    )
+    optimised_green_pct = (
+        100 * optimised_green_kwh / optimised_total if optimised_total > 0 else 0
+    )
 
     # Save results in session_state
     st.session_state.optimised = True
@@ -274,34 +419,11 @@ if st.button("🚀 Run Optimisation"):
         "baseline_green_pct": baseline_green_pct,
     }
 
-    # -----------------------------
-    # UI: Results
-    # -----------------------------
-    st.success("Optimisation complete ✅")
 
-    st.header("📈 Results Dashboard")
-
-    k1, k2, k3 = st.columns(3)
-    k1.metric("£ Saved", f"£{cost_saved:0.2f}")
-    k2.metric("CO₂ Avoided (kg)", f"{co2_saved_kg:0.1f}")
-    k3.metric(
-        "% Load in Green Hours",
-        f"{optimised_green_pct:0.1f}%",
-        delta=f"{(optimised_green_pct - baseline_green_pct):+0.1f} pp"
-    )
-
-    # Comparison chart
-    st.subheader("Baseline vs Optimised Load Profile")
-    st.line_chart(
-        df.set_index("timestamp")[["baseline_kwh", "optimised_kwh"]]
-    )
-
-
-    # ----------------------------------------------------
-    # 6. Scaling Slider — Aggregation Across Many Homes
-    # ----------------------------------------------------
-if st.session_state.optimised:
-
+# ----------------------------------------------------
+# 6. Results Dashboard (shown whenever results exist)
+# ----------------------------------------------------
+if st.session_state.optimised and st.session_state.results is not None:
     res = st.session_state.results
     df = res["df"]
     cost_saved = res["cost_saved"]
@@ -309,21 +431,37 @@ if st.session_state.optimised:
     optimised_green_pct = res["optimised_green_pct"]
     baseline_green_pct = res["baseline_green_pct"]
 
-    st.success("Optimisation complete ✅")
+    st.success("Optimisation complete ✅ Axel found a better schedule.")
 
-    st.header("📈 Results Dashboard")
+    st.subheader("📈 Results Dashboard")
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("£ Saved", f"£{cost_saved:.2f}")
-    k2.metric("CO₂ Avoided (kg)", f"{co2_saved_kg:.1f}")
-    k3.metric(
-        "% Load in Green Hours",
-        f"{optimised_green_pct:.1f}%",
-        delta=f"{(optimised_green_pct - baseline_green_pct):+.1f} pp",
-    )
+    with k1:
+        st.markdown(
+            soft_metric("£ Saved (per day)", fmt_money(cost_saved)),
+            unsafe_allow_html=True,
+        )
 
-    st.subheader("Baseline vs Optimised Load Profile")
-    st.line_chart(df.set_index("timestamp")[["baseline_kwh", "optimised_kwh"]])
+    with k2:
+        st.markdown(
+            soft_metric("CO₂ Avoided (per day)", fmt_co2(co2_saved_kg)),
+            unsafe_allow_html=True,
+        )
+
+    with k3:
+        delta_pp = optimised_green_pct - baseline_green_pct
+        value = f"{optimised_green_pct:0.1f}% <span style='font-size:0.85rem; color:#16a34a;'>({delta_pp:+0.1f} pp)</span>"
+        st.markdown(
+            soft_metric("Load in Green Hours", value),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("### Baseline vs Optimised Load Profile")
+    st.caption("We keep comfort and energy needs the same, but move flexible demand into better hours.")
+    fig = plot_optimised(df)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
 
     # -----------------------------
     # Scaling Slider
@@ -338,19 +476,34 @@ if st.session_state.optimised:
         step=1000,
     )
 
-    st.metric("Scaled £ Savings", fmt_money(cost_saved * n_homes))
-    st.metric("Scaled CO₂ Savings", fmt_co2(co2_saved_kg * n_homes))
+    scaled_cost = cost_saved * n_homes
+    scaled_co2  = co2_saved_kg * n_homes
 
+    colA, colB = st.columns(2)
+
+    with colA:
+        st.markdown(
+            soft_metric(
+                "Total £ Savings (per day)",
+                fmt_money(scaled_cost)
+            ),
+            unsafe_allow_html=True
+        )
+
+    with colB:
+        st.markdown(
+            soft_metric(
+                "Total CO₂ Avoided (per day)",
+                fmt_co2(scaled_co2)
+            ),
+            unsafe_allow_html=True
+        )
 
 # ----------------------------------------------------
-# End
+# Footer
 # ----------------------------------------------------
-
-
-
-
-
-
-
-
-
+st.divider()
+st.caption(
+    "Built as a demo for Axel — showing how household flexibility "
+    "turns real grid data into cost savings and decarbonisation."
+)
