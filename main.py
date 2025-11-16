@@ -11,6 +11,21 @@ from baseline import (
 )
 from optimiser import optimise_ev, optimise_heatpump
 
+
+# ----------------------------------------------------
+# Formatting helpers (money, CO₂, etc.)
+# ----------------------------------------------------
+def fmt_money(x):
+    """Format numbers as £ with thousands separators."""
+    return f"£{x:,.2f}"
+
+def fmt_co2(x_kg):
+    """Format kg into kg or tonnes depending on size."""
+    if x_kg >= 1000:
+        return f"{x_kg/1000:,.1f} t"
+    return f"{x_kg:,.1f} kg"
+
+
 if "optimised" not in st.session_state:
     st.session_state.optimised = False
 
@@ -317,14 +332,14 @@ if st.session_state.optimised:
 
     n_homes = st.slider(
         "How many homes should this optimisation represent?",
-        min_value=1,
-        max_value=50000,
-        value=1,
-        step=1,
+        min_value=1000,
+        max_value=1000000,
+        value=1000,
+        step=1000,
     )
 
-    st.metric("Scaled £ Savings", f"£{cost_saved * n_homes:.2f}")
-    st.metric("Scaled CO₂ Savings (kg)", f"{co2_saved_kg * n_homes:.1f}")
+    st.metric("Scaled £ Savings", fmt_money(cost_saved * n_homes))
+    st.metric("Scaled CO₂ Savings", fmt_co2(co2_saved_kg * n_homes))
 
 
 # ----------------------------------------------------
