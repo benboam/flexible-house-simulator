@@ -46,7 +46,7 @@ if "results" not in st.session_state:
 # Page Config + Global Styling (Soft UI)
 # ----------------------------------------------------
 st.set_page_config(
-    page_title="Axel Home Optimiser",
+    page_title="Axle Home Optimiser",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
