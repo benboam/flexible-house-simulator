@@ -35,7 +35,7 @@ def make_product_plot(df):
     ).encode(
         y=alt.Y(
             "renewable_share:Q",
-            axis=alt.Axis(title="Wind and Solar Generation share(%)", titleColor="#2ECC71")
+            axis=alt.Axis(title="Green Generation share(%)", titleColor="#2ECC71")
         ),
         tooltip=[
             alt.Tooltip("timestamp:T", title="Time"),
@@ -65,7 +65,7 @@ def make_product_plot(df):
     ).properties(
         width="container",
         height=350,
-        title="Renewable Share vs Agile Price"
+        title="Wind and Solar Generation Share vs Octopus Agile Price"
     )
 
     return chart
