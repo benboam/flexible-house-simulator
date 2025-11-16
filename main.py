@@ -156,19 +156,23 @@ def soft_metric(label, value):
 
 
 
-st.title("⚡ Axel Home Flex Optimiser")
-st.markdown(
-        """
-Imagine thousands of homes acting like a **virtual power plant**.
+st.title("⚡ What You Could Unlock With Axle Energy")
 
-This demo uses real UK grid data and shows how smartly shifting **EV charging** and **heating**
-can:
+st.markdown("""
+With **Axle under the hood**, your customers get effortless smart charging & heating.  
+Your business gets better economics, margin protection, and access to energy markets.
 
-- cut **costs** for households  
-- reduce **CO₂**  
-- and make the grid more **renewable-friendly**.
-"""
-    )
+With Axle, you can offer customers:
+
+- **Lower bills** without requiring behaviour change  
+- EV charging or heating that is **“ready when needed”** — never at the wrong time  
+- **Automatic optimisation** across wholesale, balancing & flexibility markets  
+- **Transparent rewards** for supporting the grid  
+- **Full control & safety** (they can override at any time)
+
+This interface simulates what your customer experience could look like —  
+and the **savings and hedging value** your business can unlock behind the scenes.   
+""")
 
 
 
@@ -206,22 +210,39 @@ if df.empty:
 # ----------------------------------------------------
 # 2. Grid Overview (Tabs)
 # ----------------------------------------------------
-st.subheader("🌱 Clean Energy & Price Landscape")
+st.subheader("🌱 How Axle Helps You Offer Competitive Pricing — Safely")
+
+st.markdown("""
+Your customers expect **simple, low-cost, reliable charging**.  
+Your business needs to avoid **exposure to peak wholesale prices** and high-carbon hours.
+
+This chart shows, for the selected day:
+
+- Where **prices spike** (your wholesale risk exposure)  
+- When **clean, cheap energy** is available   
+
+""")
+
 st.altair_chart(make_product_plot(df), use_container_width=True)
 
 
 # ----------------------------------------------------
 # 3. Home Profile (Friendly cards)
 # ----------------------------------------------------
-st.subheader("🏠 Home Energy Profile")
+st.subheader("🏠 Your Customers Set Simple Preferences. Axle Handles Everything Else.")
 
-st.markdown(
-    """
-Describe a **typical day** in this home.
+st.markdown("""
+Your customer tells you things like:
 
-We'll build a **baseline** (unoptimised) load profile from these assumptions.
-"""
-)
+- “I need my EV ready by 7am.”  
+- “Heat my home between 6–10pm.”  
+- “Use my battery to save me money.”
+
+Axle turns these preferences into actionable, safe, real-time flexibility —  
+so your brand delivers a great experience **without any new engineering burden**.
+""")
+
+
 
 profile_cols = st.columns(3)
 
@@ -314,15 +335,17 @@ with st.spinner("Building baseline load models..."):
 # ----------------------------------------------------
 st.subheader("📊 Baseline Load Profile")
 
-st.markdown(
-    """
-This is how the home would normally behave, **without** any smart control:
+st.markdown("""
+This chart shows your customer’s **current unoptimised behaviour**:
 
-- EV starts charging as soon as it arrives  
-- Heating is spread across comfort windows  
-- Household baseload ticks along in the background
-"""
-)
+- EV charges as soon as it plugs in  
+- Heating follows fixed comfort windows  
+- No awareness of wholesale prices or carbon intensity  
+
+Axle builds flexible capacity from these everyday patterns —  
+*while keeping comfort, readiness, and user control intact.*
+""")
+
 
 #baseline_cols = ["ev_kwh", "hp_kwh", "house_kwh", "baseline_kwh"]
 st.altair_chart(plot_baseline(df), use_container_width=True)
@@ -334,10 +357,21 @@ st.divider()
 # ----------------------------------------------------
 # 4. Optimisation Goal
 # ----------------------------------------------------
-st.subheader("🎯 Optimisation Goal")
+st.subheader("🎯 Choose the Strategy That Aligns With Your Product")
+
+st.markdown("""
+Different products prioritise different outcomes:
+
+- **Cheapest cost** → reduces exposure to peak wholesale prices  
+- **Lowest carbon** → enables green tariffs with real impact  
+- **Balanced** → ideal for broad customer bases  
+
+Axle can optimise for any of these, depending on the proposition you want to offer.
+""")
+
 
 opt_goal = st.radio(
-    "What should Axel optimise for on this day?",
+    "What outcome should your product prioritise for customers?",
     ["Cheapest energy", "Lowest carbon", "Balanced"],
     horizontal=True,
 )
@@ -431,9 +465,25 @@ if st.session_state.optimised and st.session_state.results is not None:
     optimised_green_pct = res["optimised_green_pct"]
     baseline_green_pct = res["baseline_green_pct"]
 
-    st.success("Optimisation complete ✅ Axel found a better schedule.")
+    st.success("Optimisation complete — this is the value your customers (and you) unlock with Axle.")
 
-    st.subheader("📈 Results Dashboard")
+
+
+    st.subheader("📈 What You Can Offer Customers — And What You Gain Behind the Scenes")
+
+    st.markdown("""
+    ### The customer gets:
+    - The **same comfort and convenience**
+    - **Lower bills**  
+    - Completely **effortless flexibility**
+
+    ### Your business gets:
+    - **Hedge protection** against volatile peaks  
+    - **Increased margin** on flexible customers  
+    - Access to **wholesale, capacity, DSO & ESO markets**  
+    - A **differentiated, stickier proposition** that keeps customers for longer  
+    """)
+
 
     k1, k2, k3 = st.columns(3)
     with k1:
@@ -457,7 +507,7 @@ if st.session_state.optimised and st.session_state.results is not None:
         )
 
     st.markdown("### Baseline vs Optimised Load Profile")
-    st.caption("We keep comfort and energy needs the same, but move flexible demand into better hours.")
+    st.caption("Your customer gets the same comfort and readiness — you avoid peak exposure and unlock new value.")
     fig = plot_optimised(df)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -466,7 +516,20 @@ if st.session_state.optimised and st.session_state.results is not None:
     # -----------------------------
     # Scaling Slider
     # -----------------------------
-    st.subheader("🏘️ Scale to More Homes")
+    st.subheader("🏘️ Portfolio Impact — What This Looks Like at Scale")
+
+    st.markdown("""
+    Scale today’s optimisation from **one customer** to your **full consumer base**.
+
+    This shows your portfolio-level upside:
+
+    - Total **wholesale risk avoided**  
+    - Total **CO₂ avoided**  
+
+    This reveals the **strategic and commercial value** of flexibility at scale —  
+    not just per household.
+    """)
+
 
     n_homes = st.slider(
         "How many homes should this optimisation represent?",
@@ -503,7 +566,7 @@ if st.session_state.optimised and st.session_state.results is not None:
 # Footer
 # ----------------------------------------------------
 st.divider()
-st.caption(
-    "Built as a demo for Axel — showing how household flexibility "
-    "turns real grid data into cost savings and decarbonisation."
-)
+st.caption("""
+This demo illustrates how Axle enables partners to offer cheaper, cleaner,
+automated energy experiences — while improving portfolio economics and accessing new value streams.
+""")
