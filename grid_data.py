@@ -69,12 +69,18 @@ def fetch_prices(date_str):
 
     url = f"{base_url}?period_from={period_from}&period_to={period_to}"
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; curl/8.0)",
+        "Accept": "application/json",
+        "Connection": "close"
+    }
+
     rows = []
 
     print("DEBUG: starting fetch_prices for", date_str)
     while url:
         print("DEBUG: GET", url)
-        r = requests.get(url)
+        r = requests.get(url,timeout=(5,15), headers=headers)
         print("DEBUG: status_code", r.status_code)
         try:
             data = r.json()
