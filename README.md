@@ -5,7 +5,7 @@ Can be used here: https://flexible-house-simulator-for-axle.streamlit.app/
 
 This app is a **simple, time-boxed demo** that illustrates how Axle Energy could present value to OEMs, charger companies, energy suppliers, and battery providers.
 
-The goal is **not** to replicate Axle’s real optimisation engine, orchestration layer, or market integrations — but to show, at a product level, how partners might experience:
+The goal is **not** to replicate Axle’s real optimisation engine but to show, at a product level, how partners might experience:
 
 - lower wholesale exposure  
 - EV charging “ready when needed”  
